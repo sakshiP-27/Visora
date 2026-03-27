@@ -1,0 +1,5 @@
+{
+  "user_id": "uuid",
+  "image": "file",
+  "notes": "optional user input like 'business expense'"
+}

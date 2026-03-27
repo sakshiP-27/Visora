@@ -1,0 +1,22 @@
+{
+  "receipt_id": "uuid",
+  "merchant": "Reliance Smart",
+  "date": "2026-03-27",
+  "total_amount": 845.50,
+  "items": [
+    {
+      "name": "Milk",
+      "price": 60,
+      "category": "Food"
+    },
+    {
+      "name": "Shampoo",
+      "price": 240,
+      "category": "Personal Care"
+    }
+  ],
+  "categories_summary": {
+    "Food": 300,
+    "Personal Care": 240
+  }
+}
