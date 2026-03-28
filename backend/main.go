@@ -3,6 +3,7 @@ package main
 import (
 	"Backend/configs"
 	"Backend/handlers"
+	"Backend/middlewares"
 	"Backend/services"
 	"context"
 	"fmt"
@@ -20,6 +21,10 @@ func main() {
 	fmt.Println("Initialising Router")
 	r := chi.NewRouter()
 
+	// applying the common middlewares
+	r.Use(middlewares.LoggingMiddleware)
+
+	// healthcheck route
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"message": "Backend Service running"}`))
 	})
@@ -34,6 +39,12 @@ func main() {
 	r.Post("/auth/login", authHandler.HandleLogin)
 	r.Post("/auth/signup", authHandler.HandleSignUp)
 
+	r.Group(func(r chi.Router) {
+		// using the authorization & authentication middlewares only for these routes
+		r.Use(middlewares.AuthZMiddleware)
+		r.Use(middlewares.AuthNMiddleware)
+	})
+
 	// getting the configs
 	serverConfig := configs.GetServerConfig()
 
@@ -42,7 +53,7 @@ func main() {
 
 	if serverConfig.Env == "development" {
 		server = &http.Server{
-			Addr:         serverConfig.Port,
+			Addr:         serverConfig.BackendPort,
 			Handler:      r,
 			ReadTimeout:  10 * time.Second,
 			WriteTimeout: 10 * time.Second,
