@@ -1,5 +1,5 @@
 {
-  "image_url": "https://your-storage.com/receipt123.jpg",
+  "image": "image file",
   "user_context": {
     "currency": "INR",
     "country": "India"

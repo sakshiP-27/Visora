@@ -1,7 +1,7 @@
 {
   "merchant": "Reliance Smart",
   "date": "2026-03-27",
-  "total_amount": 845.50,
+  "totalAmount": 845.50,
   "currency": "INR",
   "items": [
     {
@@ -15,5 +15,5 @@
       "category": "Personal Care"
     }
   ],
-  "confidence_score": 0.92
+  "confidenceScore": 0.92
 }
