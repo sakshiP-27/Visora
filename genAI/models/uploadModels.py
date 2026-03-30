@@ -16,7 +16,7 @@ class UploadReceiptRequest(BaseModel):
 class ReceiptItem(BaseModel):
     name: str
     price: float
-    quantity: int
+    quantity: int = 1
     category: str
 
 

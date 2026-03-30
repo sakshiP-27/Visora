@@ -42,6 +42,7 @@ type BackendUploadResponse struct {
 	Merchant          string             `json:"merchant"`
 	Date              string             `json:"date"`
 	TotalAmount       float64            `json:"totalAmount"`
+	Currency          string             `json:"currency"`
 	Items             []ReceiptItems     `json:"items"`
 	CategoriesSummary map[string]float64 `json:"categoriesSummary"`
 }

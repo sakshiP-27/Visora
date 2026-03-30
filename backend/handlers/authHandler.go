@@ -37,27 +37,23 @@ func (s *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(&loginReq)
 
 	if err != nil {
-		slog.Debug(
-			"Incorrect request object sent",
-		)
-
+		slog.Warn("Failed to decode login request body")
 		errorJson, badRequestError := errors.NewBadRequestError("Incorrect request object sent", err)
-
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(badRequestError.Code)
 		w.Write(errorJson)
 		return
 	}
 
-	// calling the login service to get the auth token
+	slog.Info("Login attempt received")
+
 	token, userID, userEmail, role, serviceErr, errJson, errCode := s.Service.Login(loginReq.Email, loginReq.Password)
 
 	if serviceErr != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(errCode)
 		w.Write(errJson)
-
-		slog.Debug("Login Failed!", slog.String("Email", loginReq.Email))
+		slog.Warn("Login failed", slog.Int("StatusCode", errCode))
 		return
 	}
 
@@ -68,7 +64,7 @@ func (s *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write(responseJson)
 
-	slog.Info("Login Successful!", slog.String("Email", loginReq.Email))
+	slog.Info("Login successful", slog.String("UserID", userID), slog.String("Role", role))
 }
 
 func (s *AuthHandler) HandleSignUp(w http.ResponseWriter, r *http.Request) {
@@ -82,19 +78,15 @@ func (s *AuthHandler) HandleSignUp(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(&signupReq)
 
 	if err != nil {
-		slog.Debug(
-			"Incorrect signup request object sent!",
-			slog.String("Email", signupReq.Email),
-		)
-
+		slog.Warn("Failed to decode signup request body")
 		errJson, badRequestError := errors.NewBadRequestError("Incorrect signup request object sent!", err)
-
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(badRequestError.Code)
 		w.Write(errJson)
-
 		return
 	}
+
+	slog.Info("Signup attempt received")
 
 	token, userID, userEmail, role, serviceErr, errJson, errCode := s.Service.Signup(signupReq.Email, signupReq.Password)
 
@@ -102,8 +94,7 @@ func (s *AuthHandler) HandleSignUp(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(errCode)
 		w.Write(errJson)
-
-		slog.Debug("Signup Failed!", slog.String("Email", signupReq.Email))
+		slog.Warn("Signup failed", slog.Int("StatusCode", errCode))
 		return
 	}
 
@@ -114,5 +105,5 @@ func (s *AuthHandler) HandleSignUp(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write(responseJson)
 
-	slog.Info("Signup Successful!", slog.String("Email", signupReq.Email))
+	slog.Info("Signup successful", slog.String("UserID", userID), slog.String("Role", role))
 }

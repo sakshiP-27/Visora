@@ -76,8 +76,8 @@ func main() {
 		server = &http.Server{
 			Addr:         serverConfig.BackendPort,
 			Handler:      r,
-			ReadTimeout:  10 * time.Second,
-			WriteTimeout: 10 * time.Second,
+			ReadTimeout:  30 * time.Second,
+			WriteTimeout: 60 * time.Second,
 			IdleTimeout:  60 * time.Second,
 		}
 	}

@@ -2,9 +2,7 @@ package handlers
 
 import (
 	"Backend/errors"
-	"Backend/models"
 	"Backend/services"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 )
@@ -20,37 +18,59 @@ func (s *UploadHandler) HandleReceiptUploads(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	var uploadReq models.UploadRequest
-	err := json.NewDecoder(r.Body).Decode(&uploadReq)
-
+	// parse as multipart form (max 10 MB)
+	err := r.ParseMultipartForm(10 << 20)
 	if err != nil {
-		slog.Debug(
-			"Incorrect request object sent",
-		)
-
-		errorJson, badRequestError := errors.NewBadRequestError("Incorrect request object sent", err)
-
+		slog.Warn("Failed to parse multipart form")
+		errorJson, badRequestError := errors.NewBadRequestError("Error parsing multipart form, file too large or bad request", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(badRequestError.Code)
 		w.Write(errorJson)
 		return
 	}
 
-	// extracting user info from the request context (set by AuthZ middleware)
+	// read form fields
+	currency := r.FormValue("currency")
+	if currency == "" {
+		slog.Warn("Missing required field: currency")
+		errorJson, badRequestError := errors.NewBadRequestError("Missing required field: currency", nil)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(badRequestError.Code)
+		w.Write(errorJson)
+		return
+	}
+
+	// extract the image file
+	file, header, err := r.FormFile("image")
+	if err != nil {
+		slog.Error("Failed to extract uploaded image from form")
+		errorJson, badRequestError := errors.NewBadRequestError("Error extracting uploaded receipt image", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(badRequestError.Code)
+		w.Write(errorJson)
+		return
+	}
+	defer file.Close()
+
 	userID := r.Context().Value("userID").(string)
 	email := r.Context().Value("email").(string)
 
-	// sending the request data to the service
-	responseData, err, errCode, errJsonData := s.Service.ProcessReceiptImage(uploadReq.Message, uploadReq.Currency, userID, email, r)
+	slog.Info("Receipt upload request received",
+		slog.String("UserID", userID),
+		slog.String("Currency", currency),
+		slog.String("Filename", header.Filename),
+		slog.Int64("FileSize", header.Size),
+	)
+
+	responseData, err, errCode, errJsonData := s.Service.ProcessReceiptImage(file, currency, userID, email)
 
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(errCode)
 		w.Write(errJsonData)
-
-		slog.Error(
-			"Receipt image upload failed!",
-			slog.Any("Error", err),
+		slog.Error("Receipt upload failed",
+			slog.String("UserID", userID),
+			slog.Int("StatusCode", errCode),
 		)
 		return
 	}
@@ -59,5 +79,5 @@ func (s *UploadHandler) HandleReceiptUploads(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusOK)
 	w.Write(responseData)
 
-	slog.Info("Receipt image uploaded successfully!", slog.String("UserID", userID))
+	slog.Info("Receipt uploaded successfully", slog.String("UserID", userID))
 }

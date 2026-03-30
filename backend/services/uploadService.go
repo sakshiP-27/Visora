@@ -19,44 +19,26 @@ type UploadService struct {
 	Repo *repositories.UploadRepository
 }
 
-var serverConfig configs.ServerConfig
+var serverConfig *configs.ServerConfig
 
-var GenAIURL string = fmt.Sprintf("http://%s:%s/%s", serverConfig.GenAIHost, serverConfig.GenAIPort, serverConfig.GenAIUploadEndpoint)
+func init() {
+	serverConfig = configs.GetServerConfig()
+}
+
+func getGenAIURL() string {
+	return fmt.Sprintf("http://%s%s%s", serverConfig.GenAIHost, serverConfig.GenAIPort, serverConfig.GenAIUploadEndpoint)
+}
 
 func NewUploadService(repo *repositories.UploadRepository) *UploadService {
 	return &UploadService{Repo: repo}
 }
 
-func (*UploadService) ProcessReceiptImage(message string, currency string, userID string, email string, r *http.Request) ([]byte, error, int, []byte) {
-	// parsing the multipart form
-	err := r.ParseMultipartForm(10 << 20)
+func (*UploadService) ProcessReceiptImage(file multipart.File, currency string, userID string, email string) ([]byte, error, int, []byte) {
+	slog.Info("Processing receipt image",
+		slog.String("UserID", userID),
+		slog.String("Currency", currency),
+	)
 
-	if err != nil {
-		slog.Debug(
-			"Error while parsing the file, file too large or bad request",
-			slog.Any("Error", err),
-			slog.Any("Request Body", r.Body),
-		)
-		errJsonData, badRequestError := errors.NewBadRequestError("Error while parsing the file, file too large or bad request!", err)
-		return nil, badRequestError, badRequestError.Code, errJsonData
-	}
-
-	// extract the image from the file field
-	file, _, err := r.FormFile("image")
-
-	if err != nil {
-		slog.Error(
-			"Error while extracting the uploaded receipt image, bad request!",
-			slog.Any("Error", err),
-			slog.Any("Request Body", r.Body),
-		)
-		errJsonData, badRequestError := errors.NewBadRequestError("Error while extracting the uploaded receipt image, bad request!", err)
-		return nil, badRequestError, badRequestError.Code, errJsonData
-	}
-
-	defer file.Close() // close the file at the end of all the processing
-
-	// send the request to GenAI service
 	responseData, responseError, responseErrorCode, errorData := sendUploadReceiptToGenAI(file, currency)
 
 	if responseError != nil {
@@ -64,24 +46,30 @@ func (*UploadService) ProcessReceiptImage(message string, currency string, userI
 	}
 
 	var uploadResp models.GenAIUploadResponse
-	err = json.Unmarshal(responseData, &uploadResp)
+	err := json.Unmarshal(responseData, &uploadResp)
 
 	if err != nil {
-		slog.Error(
-			"Error while unmarshaling the GenAI response!",
-			slog.Any("Error", err),
-		)
+		slog.Error("Failed to unmarshal GenAI response")
 		errJsonData, internalServerError := errors.NewInternalServerError("Error while unmarshaling the GenAI response!", err)
 		return nil, internalServerError, internalServerError.Code, errJsonData
 	}
 
+	slog.Info("GenAI response parsed successfully",
+		slog.String("Merchant", uploadResp.Merchant),
+		slog.String("Date", uploadResp.Date),
+		slog.Float64("TotalAmount", uploadResp.TotalAmount),
+		slog.String("Currency", uploadResp.Currency),
+		slog.Int("ItemCount", len(uploadResp.Items)),
+		slog.Float64("ConfidenceScore", uploadResp.ConfidenceScore),
+	)
+
 	// TODO: store this data in the DB and get the receipt ID
 
-	// building the backend response
 	var receiptID int = 0
 	var merchant string = uploadResp.Merchant
 	var date string = uploadResp.Date
 	var totalAmount float64 = uploadResp.TotalAmount
+	var receiptCurrency string = uploadResp.Currency
 	var receiptItems []models.ReceiptItems = uploadResp.Items
 	var categoriesSummary map[string]float64 = buildCategoriesSummary(receiptItems)
 
@@ -92,37 +80,39 @@ func (*UploadService) ProcessReceiptImage(message string, currency string, userI
 		Merchant:          merchant,
 		Date:              date,
 		TotalAmount:       totalAmount,
+		Currency:          receiptCurrency,
 		Items:             receiptItems,
 		CategoriesSummary: categoriesSummary,
 	}
 
-	// marshaling the response in json
 	jsonResponse, err := json.Marshal(backendResp)
 
 	if err != nil {
-		slog.Error(
-			"Error while marshaling the backend response to send to frontend!",
-			slog.Any("Error", err),
-		)
+		slog.Error("Failed to marshal backend response")
 		errJsonData, internalServerError := errors.NewInternalServerError("Error while marshaling the backend response to send to frontend!", err)
 		return nil, internalServerError, internalServerError.Code, errJsonData
 	}
+
+	slog.Info("Backend response built successfully",
+		slog.String("UserID", userID),
+		slog.Int("CategoryCount", len(categoriesSummary)),
+	)
 
 	return jsonResponse, nil, 0, nil
 }
 
 func sendUploadReceiptToGenAI(receiptImage multipart.File, currency string) ([]byte, error, int, []byte) {
-	// read the file bytes
 	imageBytes, err := io.ReadAll(receiptImage)
 
 	if err != nil {
-		slog.Error(
-			"Error while reading the image bytes!",
-			slog.Any("Error", err),
-		)
+		slog.Error("Failed to read image bytes")
 		errJsonData, internalServerError := errors.NewInternalServerError("Error while reading the image bytes!", err)
 		return nil, internalServerError, internalServerError.Code, errJsonData
 	}
+
+	slog.Info("Image read successfully",
+		slog.Int("ImageSizeBytes", len(imageBytes)),
+	)
 
 	genAIReq := models.GenAIRequest{
 		Image: base64.StdEncoding.EncodeToString(imageBytes),
@@ -132,48 +122,55 @@ func sendUploadReceiptToGenAI(receiptImage multipart.File, currency string) ([]b
 		},
 	}
 
-	// marshal the struct to JSON before sending
 	jsonBody, err := json.Marshal(genAIReq)
 
 	if err != nil {
-		slog.Error(
-			"Error while forming the request body to send to GenAI service",
-			slog.Any("Error", err),
-			slog.Any("Body", jsonBody),
-		)
+		slog.Error("Failed to marshal GenAI request body")
+		errJsonData, internalServerError := errors.NewInternalServerError("Error while forming the request body to send to GenAI service", err)
+		return nil, internalServerError, internalServerError.Code, errJsonData
 	}
 
-	// make the POST request
-	response, err := http.Post(GenAIURL, "application/json", bytes.NewBuffer(jsonBody))
+	genAIURL := getGenAIURL()
+	slog.Info("Sending request to GenAI service",
+		slog.String("URL", genAIURL),
+		slog.Int("PayloadSizeBytes", len(jsonBody)),
+	)
+
+	response, err := http.Post(genAIURL, "application/json", bytes.NewBuffer(jsonBody))
 
 	if err != nil {
-		slog.Error(
-			"Error while sending the request to Gen AI service",
-			slog.Any("Error", err),
-			slog.Any("Request", jsonBody),
+		slog.Error("Failed to send request to GenAI service",
+			slog.String("URL", genAIURL),
 		)
-
 		errJsonData, internalServerError := errors.NewInternalServerError("Error while sending the request to Gen AI service", err)
 		return nil, internalServerError, internalServerError.Code, errJsonData
 	}
 
 	defer response.Body.Close()
 
-	// read the reponse
 	responseBody, err := io.ReadAll(response.Body)
 
 	if err != nil {
-		slog.Error(
-			"Error while reading the response for Upload request",
-			slog.Any("Error", err),
-			slog.Any("Request", jsonBody),
-		)
-
+		slog.Error("Failed to read GenAI response body")
 		errJsonData, internalServerError := errors.NewInternalServerError("Error while reading the response for Upload request", err)
 		return nil, internalServerError, internalServerError.Code, errJsonData
 	}
 
-	// return the successful response
+	if response.StatusCode != http.StatusOK {
+		slog.Error("GenAI service returned error",
+			slog.Int("StatusCode", response.StatusCode),
+			slog.Int("ResponseSizeBytes", len(responseBody)),
+		)
+		errJsonData, internalServerError := errors.NewInternalServerError(
+			fmt.Sprintf("GenAI service error (status %d)", response.StatusCode), nil)
+		return nil, internalServerError, internalServerError.Code, errJsonData
+	}
+
+	slog.Info("GenAI response received",
+		slog.Int("StatusCode", response.StatusCode),
+		slog.Int("ResponseSizeBytes", len(responseBody)),
+	)
+
 	return responseBody, nil, 0, nil
 }
 
