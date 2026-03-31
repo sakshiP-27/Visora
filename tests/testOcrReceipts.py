@@ -12,8 +12,8 @@ from PIL import Image
 from io import BytesIO
 from mindee import ClientV2, InferenceParameters, InferenceResponse, BytesInput
 
-OCR_API_KEY="md_smFOeVJ6XaFRClmReATP94V_j-DuW7Xka0GJTH16S1A"
-MODEL_ID="c753cb76-c9e7-44e4-8fc3-44963d50c31c"
+OCR_API_KEY=""
+MODEL_ID=""
 IMAGE_PATH = ""
 
 def extract_receipt_data():
