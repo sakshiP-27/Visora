@@ -19,10 +19,12 @@ logger = logging.getLogger("genai.cv")
 
 
 class ProcessReceipts:
-    def __init__(self, ocrApiKey, modelId, geminiApiKey, groqApiKey):
+    def __init__(self, ocrApiKey, modelId, geminiApiKey, groqApiKey, geminiModel, groqModel):
         self.ocrApiKey = ocrApiKey
         self.geminiApiKey = geminiApiKey
         self.groqApiKey = groqApiKey
+        self.geminiModel = geminiModel
+        self.groqModel = groqModel
         self.ocrClient = ClientV2(self.ocrApiKey)
         self.geminiClient = genai.Client(api_key=self.geminiApiKey)
         self.groqClient = Groq(api_key=self.groqApiKey)
@@ -165,7 +167,7 @@ class ProcessReceipts:
         try:
             logger.info("Calling Gemini API")
             response = self.geminiClient.models.generate_content(
-                model="gemini-2.0-flash",
+                model=self.geminiModel,
                 contents=prompt
             )
             logger.info("Gemini API responded successfully")
@@ -178,7 +180,7 @@ class ProcessReceipts:
         try:
             logger.info("Calling Groq API")
             response = self.groqClient.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+                model=self.groqModel,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=1024
             )

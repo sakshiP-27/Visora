@@ -11,6 +11,8 @@ class ServerConfig:
     GENAI_GENERATE_SUMMARY_API = os.getenv("GENAI_GENERATE_SUMMARY_API", "/generatesummary")
     GENAI_GET_ANALYTICS_API = os.getenv("GENAI_GET_ANALYTICS_API", "/getanalytics")
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+    GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
     OCR_API_KEY = os.getenv("OCR_API_KEY", "")
     MODEL_ID = os.getenv("OCR_MODEL_ID")

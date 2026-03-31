@@ -23,7 +23,7 @@ def read_health():
 def process_uploaded_receipt(request: UploadReceiptRequest):
     logger.info("Receipt upload request received | Currency=%s", request.userContext.currency)
     try:
-        cvHandler = ProcessReceipts(config.OCR_API_KEY, config.MODEL_ID, config.GEMINI_API_KEY, config.GROQ_API_KEY)
+        cvHandler = ProcessReceipts(config.OCR_API_KEY, config.MODEL_ID, config.GEMINI_API_KEY, config.GROQ_API_KEY, config.GEMINI_MODEL, config.GROQ_MODEL)
         receiptData = cvHandler.convertImageToData(request.image, request.userContext.currency)
         logger.info("Receipt processed successfully | Merchant=%s ItemCount=%d",
                      receiptData.get("merchant", "unknown"), len(receiptData.get("items", [])))
