@@ -69,7 +69,7 @@ def get_user_analytics(request: SummaryRequest):
     logger.info("Get Analytics request received | User=%s", request.userID)
     try:
         analyticsHandler = ComputeAnalytics()
-        analyticsData = analyticsHandler.computeAnalytics(request)
+        analyticsData = analyticsHandler.computeAnalytics(request.model_dump())
         logger.debug("Analytics computed successfully | TotalSpent=%f CategoryWise=%d",
                         analyticsData.get("totalAmount"), len(analyticsData.get("categoryBreakdown", [])))
         return analyticsData

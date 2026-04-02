@@ -39,16 +39,22 @@ class BuildInsights:
 
     def _build_prompt(self, context: dict) -> str:
         prompt = (
-            f"You are a personal finance assistant. Analyze this spending data and respond with a JSON object "
-            f"containing exactly two fields:\n"
-            f'"summary": A brief 1-2 sentence summary of spending in {context["currency"]}\n'
-            f'"warnings": An array of strings with at least 2 warnings about unusual or high spending patterns, '
-            f"areas where the user could save money, or notable trends. Always provide at least 2 warnings.\n\n"
+            f"You are a smart personal finance assistant helping a user understand their spending habits. "
+            f"This is real receipt data from their purchases. Negative amounts represent discounts or loyalty savings.\n\n"
+            f"Analyze the data below and respond with a JSON object containing exactly two fields:\n"
+            f'"summary": A concise 1-2 sentence overview of their spending in {context["currency"]}. '
+            f"Mention the total, the biggest spending category, and one useful observation.\n"
+            f'"warnings": An array of at least 2 strings. Each warning should be a specific, actionable insight like:\n'
+            f"  - Which category they're spending the most on and a practical tip to reduce it\n"
+            f"  - A spending pattern they might not notice (e.g. frequent small purchases adding up)\n"
+            f"  - A suggestion to set a budget for their top category\n"
+            f"  - Whether they're using discounts/loyalty programs effectively\n"
+            f"Do NOT flag negative amounts as errors — they are discounts. Do NOT repeat the summary in warnings.\n\n"
             f"Spending data:\n"
             f'- Period: {context["date_range"]}\n'
             f'- Total spent: {context["currency"]} {context["total_spent"]}\n'
             f'- {context["receipt_count"]} receipts\n'
-            f"- Category breakdown:\n"
+            f"- Category breakdown (negative = discounts/savings):\n"
         )
 
         for cat, amt in context["categories"]:
