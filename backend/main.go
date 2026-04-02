@@ -56,8 +56,8 @@ func main() {
 
 	// creating services
 	authService := services.NewAuthService(authRepository)
-	uploadService := services.NewUploadService(uploadRepository)
 	summaryService := services.NewSummaryService(summaryRepository)
+	uploadService := services.NewUploadService(uploadRepository, summaryService)
 
 	// creating handlers & injecting services into them
 	authHandler := &handlers.AuthHandler{Service: authService}
@@ -74,8 +74,8 @@ func main() {
 		r.Use(middlewares.AuthNMiddleware)
 
 		r.Post(serverConfig.BackendUploadAPI, uploadHandler.HandleReceiptUploads)
-		r.Post(serverConfig.BackendAnalyticsAPI, summaryHandler.HandleAnalytics)
-		r.Post(serverConfig.BackendInsightsAPI, summaryHandler.HandleInsights)
+		r.Get(serverConfig.BackendAnalyticsAPI, summaryHandler.HandleGetAnalytics)
+		r.Get(serverConfig.BackendInsightsAPI, summaryHandler.HandleGetInsights)
 	})
 
 	// initialising the server
