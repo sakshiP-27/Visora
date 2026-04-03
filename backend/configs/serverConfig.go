@@ -16,6 +16,7 @@ type ServerConfig struct {
 	BackendManualExpenseAPI      string
 	BackendAnalyticsAPI          string
 	BackendInsightsAPI           string
+	BackendDayReceiptsAPI        string
 	GenAIPort                    string
 	GenAIHost                    string
 	GenAIUploadEndpoint          string
@@ -45,6 +46,7 @@ func GetServerConfig() *ServerConfig {
 		BackendManualExpenseAPI:      os.Getenv("BACKEND_MANUAL_EXPENSE_API"),
 		BackendAnalyticsAPI:          os.Getenv("BACKEND_ANALYTICS_API"),
 		BackendInsightsAPI:           os.Getenv("BACKEND_INSIGHTS_API"),
+		BackendDayReceiptsAPI:        os.Getenv("BACKEND_DAYRECEIPTS_API"),
 		GenAIPort:                    os.Getenv("GENAI_PORT"),
 		GenAIHost:                    os.Getenv("GENAI_HOST"),
 		GenAIUploadEndpoint:          os.Getenv("GENAI_UPLOAD_API"),

@@ -78,13 +78,21 @@ func main() {
 		r.Post(serverConfig.BackendManualExpenseAPI, uploadHandler.HandleManualExpense)
 		r.Get(serverConfig.BackendAnalyticsAPI, summaryHandler.HandleGetAnalytics)
 		r.Get(serverConfig.BackendInsightsAPI, summaryHandler.HandleGetInsights)
-		r.Get("/todayreceipts", summaryHandler.HandleGetTodayReceipts)
+		r.Get(serverConfig.BackendDayReceiptsAPI, summaryHandler.HandleGetTodayReceipts)
 	})
 
 	// initialising the server
 	var server *http.Server
 
 	if serverConfig.Env == "development" {
+		server = &http.Server{
+			Addr:         serverConfig.BackendPort,
+			Handler:      r,
+			ReadTimeout:  30 * time.Second,
+			WriteTimeout: 60 * time.Second,
+			IdleTimeout:  60 * time.Second,
+		}
+	} else if serverConfig.Env == "production" {
 		server = &http.Server{
 			Addr:         serverConfig.BackendPort,
 			Handler:      r,
