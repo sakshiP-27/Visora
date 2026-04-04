@@ -27,8 +27,8 @@ func (repo *UploadRepository) StoreReceipt(userID string, receipt models.GenAIUp
 
 	// insert receipt and get back the generated UUID
 	receiptQuery := `
-		INSERT INTO receipts (user_id, merchant, date, total_amount, currency, confidence_score, image_url, source)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, 'scan')
+		INSERT INTO receipts (user_id, merchant, date, total_amount, currency, confidence_score, image_url, image_hash, source)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'scan')
 		RETURNING id`
 
 	var receiptID string
@@ -40,6 +40,7 @@ func (repo *UploadRepository) StoreReceipt(userID string, receipt models.GenAIUp
 		receipt.Currency,
 		receipt.ConfidenceScore,
 		imageURL,
+		receipt.ImageHash,
 	).Scan(&receiptID)
 
 	if err != nil {
@@ -134,4 +135,54 @@ func (repo *UploadRepository) StoreManualExpense(userID string, expense models.M
 	)
 
 	return receiptID, nil
+}
+
+func (repo *UploadRepository) GetReceiptOnImageHash(userID string, imageHash string) (*models.StoredReceipt, error) {
+	receiptQuery := `
+		SELECT id, merchant, date, total_amount, currency, confidence_score
+		FROM receipts
+		WHERE image_hash = $1 AND user_id = $2
+		LIMIT 1`
+
+	var receiptID, merchant, date, currency string
+	var totalAmount, confidenceScore float64
+
+	err := repo.DB.QueryRow(context.Background(), receiptQuery, imageHash, userID).Scan(
+		&receiptID, &merchant, &date, &totalAmount, &currency, &confidenceScore,
+	)
+
+	if err != nil {
+		return nil, nil
+	}
+
+	itemsQuery := `
+		SELECT i.name, i.price, i.quantity, c.name AS category
+		FROM items i
+		JOIN categories c ON c.id = i.category_id
+		WHERE i.receipt_id = $1`
+
+	rows, err := repo.DB.Query(context.Background(), itemsQuery, receiptID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch items for duplicate receipt: %w", err)
+	}
+	defer rows.Close()
+
+	var items []models.ReceiptItems
+	for rows.Next() {
+		var item models.ReceiptItems
+		if err := rows.Scan(&item.Name, &item.Price, &item.Quantity, &item.Category); err != nil {
+			return nil, fmt.Errorf("failed to scan item row: %w", err)
+		}
+		items = append(items, item)
+	}
+
+	return &models.StoredReceipt{
+		ReceiptID:       receiptID,
+		Merchant:        merchant,
+		Date:            date,
+		TotalAmount:     totalAmount,
+		Currency:        currency,
+		ConfidenceScore: confidenceScore,
+		Items:           items,
+	}, nil
 }
