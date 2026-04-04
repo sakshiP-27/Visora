@@ -139,7 +139,7 @@ func (repo *UploadRepository) StoreManualExpense(userID string, expense models.M
 
 func (repo *UploadRepository) GetReceiptOnImageHash(userID string, imageHash string) (*models.StoredReceipt, error) {
 	receiptQuery := `
-		SELECT id, merchant, date, total_amount, currency, confidence_score
+		SELECT id, merchant, date::text, total_amount, currency, confidence_score
 		FROM receipts
 		WHERE image_hash = $1 AND user_id = $2
 		LIMIT 1`
@@ -152,8 +152,11 @@ func (repo *UploadRepository) GetReceiptOnImageHash(userID string, imageHash str
 	)
 
 	if err != nil {
+		slog.Info("No duplicate receipt found for hash", slog.String("ImageHash", imageHash[:16]))
 		return nil, nil
 	}
+
+	slog.Info("Duplicate receipt found", slog.String("ReceiptID", receiptID), slog.String("ImageHash", imageHash[:16]))
 
 	itemsQuery := `
 		SELECT i.name, i.price, i.quantity, c.name AS category
