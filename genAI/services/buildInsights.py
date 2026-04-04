@@ -1,11 +1,13 @@
 import json
 import logging
+import time
 
 from google import genai
 from groq import Groq
 
 logger = logging.getLogger("genai")
 
+MAX_RETRIES = 3
 _next_provider = "groq"
 
 class BuildInsights:
@@ -79,8 +81,15 @@ class BuildInsights:
             return None
         try:
             client = genai.Client(api_key=self.gemini_api_key)
-            response = client.models.generate_content(model=self.gemini_model, contents=prompt)
-            return response.text.strip()
+            for attempt in range(1, MAX_RETRIES + 1):
+                response = client.models.generate_content(model=self.gemini_model, contents=prompt)
+                if response and response.text:
+                    logger.info("Gemini call succeeded | Attempt=%d", attempt)
+                    return response.text.strip()
+                logger.warning("Gemini returned empty response | Attempt=%d/%d", attempt, MAX_RETRIES)
+                if attempt < MAX_RETRIES:
+                    time.sleep(2 * attempt)
+            return None
         except Exception as e:
             logger.error("Gemini call failed | Error=%s", str(e))
             return None
@@ -91,12 +100,19 @@ class BuildInsights:
             return None
         try:
             client = Groq(api_key=self.groq_api_key)
-            response = client.chat.completions.create(
-                model=self.groq_model,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=512,
-            )
-            return response.choices[0].message.content.strip()
+            for attempt in range(1, MAX_RETRIES + 1):
+                response = client.chat.completions.create(
+                    model=self.groq_model,
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=512,
+                )
+                if response and response.choices[0].message.content:
+                    logger.info("Groq call succeeded | Attempt=%d", attempt)
+                    return response.choices[0].message.content.strip()
+                logger.warning("Groq returned empty response | Attempt=%d/%d", attempt, MAX_RETRIES)
+                if attempt < MAX_RETRIES:
+                    time.sleep(2 * attempt)
+            return None
         except Exception as e:
             logger.error("Groq call failed | Error=%s", str(e))
             return None

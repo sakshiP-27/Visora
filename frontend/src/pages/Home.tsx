@@ -214,7 +214,7 @@ export default function Home() {
                         <label>Currency</label>
                         {currencySelect(currency, setCurrency)}
                       </div>
-                      <button className={styles.submitBtn} onClick={handleUpload} disabled={uploading}>
+                      <button className={styles.submitBtn} onClick={handleUpload} disabled={uploading || !!uploadResult}>
                         {uploading ? <><Loader2 size={18} className={styles.spin} /> Processing...</> : <><Upload size={18} /> Upload & Scan</>}
                       </button>
                     </div>

@@ -25,6 +25,7 @@ type GenAIUploadResponse struct {
 	Currency        string         `json:"currency"`
 	Items           []ReceiptItems `json:"items"`
 	ConfidenceScore float64        `json:"confidenceScore"`
+	ImageHash       string         `json:"image_hash"`
 }
 
 type ReceiptItems struct {
@@ -40,6 +41,17 @@ type ManualExpenseRequest struct {
 	Date     string         `json:"date"`
 	Currency string         `json:"currency"`
 	Items    []ReceiptItems `json:"items"`
+}
+
+// Stored Receipt from DB (used for duplicate lookups)
+type StoredReceipt struct {
+	ReceiptID       string         `json:"receiptID"`
+	Merchant        string         `json:"merchant"`
+	Date            string         `json:"date"`
+	TotalAmount     float64        `json:"totalAmount"`
+	Currency        string         `json:"currency"`
+	ConfidenceScore float64        `json:"confidenceScore"`
+	Items           []ReceiptItems `json:"items"`
 }
 
 // Backend Response struct

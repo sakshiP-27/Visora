@@ -6,6 +6,7 @@ import (
 	"Backend/models"
 	"Backend/repositories"
 	"bytes"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -40,14 +41,72 @@ func (s *UploadService) ProcessReceiptImage(file multipart.File, currency string
 		slog.String("Currency", currency),
 	)
 
-	responseData, responseError, responseErrorCode, errorData := sendUploadReceiptToGenAI(file, currency)
+	// converting the image file to bytes
+	imageBytes, err := io.ReadAll(file)
+
+	if err != nil {
+		slog.Error("Failed to read image bytes")
+		errJsonData, internalServerError := errors.NewInternalServerError("Error while reading the image bytes!", err)
+		return nil, internalServerError, internalServerError.Code, errJsonData
+	}
+
+	slog.Info("Image read successfully",
+		slog.Int("ImageSizeBytes", len(imageBytes)),
+	)
+
+	// convert the image to hash for existing lookup and storage in the DB
+	imageHash := sha256.Sum256(imageBytes)
+	imageHashString := fmt.Sprintf("%x", imageHash)
+
+	// existing receipt lookup using image hash
+	existingReceipt, err := s.Repo.GetReceiptOnImageHash(userID, imageHashString)
+
+	if err != nil {
+		slog.Error(
+			"Failed to fetch the existing lookup for the uploaded receipt in DB",
+			slog.Any("Error:", err),
+		)
+		errJsonData, internalServerError := errors.NewInternalServerError("Failed to fetch the existing lookup for the uploaded receipt in DB", err)
+		return nil, internalServerError, internalServerError.Code, errJsonData
+	}
+
+	// if image exists then eraly return else do the forward processing
+	if existingReceipt != nil {
+		slog.Info("Duplicate receipt detected, returning cached data",
+			slog.String("UserID", userID),
+			slog.String("ReceiptID", existingReceipt.ReceiptID),
+		)
+		backendResp := models.BackendUploadResponse{
+			ReceiptID:         existingReceipt.ReceiptID,
+			UserID:            userID,
+			Email:             email,
+			Merchant:          existingReceipt.Merchant,
+			Date:              existingReceipt.Date,
+			TotalAmount:       existingReceipt.TotalAmount,
+			Currency:          existingReceipt.Currency,
+			Items:             existingReceipt.Items,
+			CategoriesSummary: buildCategoriesSummary(existingReceipt.Items),
+			ConfidenceScore:   existingReceipt.ConfidenceScore,
+		}
+		jsonResponse, err := json.Marshal(backendResp)
+		if err != nil {
+			errJsonData, internalServerError := errors.NewInternalServerError("Error while marshaling cached receipt response", err)
+			return nil, internalServerError, internalServerError.Code, errJsonData
+		}
+		return jsonResponse, nil, 0, nil
+	}
+
+	responseData, responseError, responseErrorCode, errorData := sendUploadReceiptToGenAI(imageBytes, currency)
 
 	if responseError != nil {
 		return nil, responseError, responseErrorCode, errorData
 	}
 
 	var uploadResp models.GenAIUploadResponse
-	err := json.Unmarshal(responseData, &uploadResp)
+	err = json.Unmarshal(responseData, &uploadResp)
+
+	// adding the image hash string to the response struct to go ahead and store in the db
+	uploadResp.ImageHash = imageHashString
 
 	if err != nil {
 		slog.Error("Failed to unmarshal GenAI response")
@@ -118,19 +177,7 @@ func (s *UploadService) ProcessReceiptImage(file multipart.File, currency string
 	return jsonResponse, nil, 0, nil
 }
 
-func sendUploadReceiptToGenAI(receiptImage multipart.File, currency string) ([]byte, error, int, []byte) {
-	imageBytes, err := io.ReadAll(receiptImage)
-
-	if err != nil {
-		slog.Error("Failed to read image bytes")
-		errJsonData, internalServerError := errors.NewInternalServerError("Error while reading the image bytes!", err)
-		return nil, internalServerError, internalServerError.Code, errJsonData
-	}
-
-	slog.Info("Image read successfully",
-		slog.Int("ImageSizeBytes", len(imageBytes)),
-	)
-
+func sendUploadReceiptToGenAI(imageBytes []byte, currency string) ([]byte, error, int, []byte) {
 	genAIReq := models.GenAIRequest{
 		Image: base64.StdEncoding.EncodeToString(imageBytes),
 		UserContext: models.UserContext{

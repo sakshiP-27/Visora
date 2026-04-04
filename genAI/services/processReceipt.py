@@ -1,6 +1,7 @@
 import base64
 import json
 import logging
+import time
 import requests
 from io import BytesIO
 from google import genai
@@ -16,6 +17,12 @@ from utils.categoriesList import categoriesList
 from models.uploadModels import UploadReceiptResponse, ReceiptItem
 
 logger = logging.getLogger("genai.cv")
+
+# retry limits
+MAX_RETRIES = 3
+
+# module level toggle so it persists across requests
+_llm_toggle = True
 
 
 class ProcessReceipts:
@@ -54,17 +61,23 @@ class ProcessReceipts:
 
         inputSource = BytesInput(imageBytes, filename=f"receipt.{extension}")
 
-        # Call Mindee OCR
-        logger.info("Calling Mindee OCR")
-        try:
-            result = self.ocrClient.enqueue_and_get_result(
-                InferenceResponse,
-                inputSource,
-                params
-            )
-        except Exception as e:
-            logger.error("Mindee OCR call failed | Error=%s", str(e))
-            raise RuntimeError(f"Mindee OCR call failed: {e}")
+        # Call Mindee OCR with retry logic
+        result = None
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                logger.info("Calling Mindee OCR | Attempt=%d/%d", attempt, MAX_RETRIES)
+                result = self.ocrClient.enqueue_and_get_result(
+                    InferenceResponse,
+                    inputSource,
+                    params
+                )
+                break
+            except Exception as e:
+                logger.error("Mindee OCR attempt %d failed | Error=%s", attempt, str(e))
+                if attempt == MAX_RETRIES:
+                    raise RuntimeError(f"Mindee OCR failed after {MAX_RETRIES} attempts: {e}")
+                time.sleep(2 * attempt)
+
 
         # Extract fields
         fields = result.inference.result.fields
@@ -135,16 +148,15 @@ class ProcessReceipts:
             f"No explanation, just the JSON array."
         )
 
-        if not hasattr(self, "_llm_toggle"):
-            self._llm_toggle = True
+        global _llm_toggle
 
-        if self._llm_toggle:
+        if _llm_toggle:
             primary, fallback = self._call_gemini, self._call_groq
             primaryName, fallbackName = "Gemini", "Groq"
         else:
             primary, fallback = self._call_groq, self._call_gemini
             primaryName, fallbackName = "Groq", "Gemini"
-        self._llm_toggle = not self._llm_toggle
+        _llm_toggle = not _llm_toggle
 
         logger.info("Categorizing %d items | Primary=%s Fallback=%s", len(itemSummaries), primaryName, fallbackName)
 
@@ -155,7 +167,14 @@ class ProcessReceipts:
 
         if result:
             try:
-                parsed = json.loads(result)
+                # strip markdown code fences if present (e.g. ```json ... ```)
+                cleaned = result.strip()
+                if cleaned.startswith("```"):
+                    cleaned = cleaned.split("\n", 1)[1]  
+                    cleaned = cleaned.rsplit("```", 1)[0]
+                    cleaned = cleaned.strip()
+
+                parsed = json.loads(cleaned)
                 category_map = {entry["name"]: entry["category"] for entry in parsed}
                 for item in itemsList:
                     item["category"] = category_map.get(item["name"], "Miscellaneous")
@@ -174,12 +193,18 @@ class ProcessReceipts:
     def _call_gemini(self, prompt: str) -> str | None:
         try:
             logger.info("Calling Gemini API")
-            response = self.geminiClient.models.generate_content(
-                model=self.geminiModel,
-                contents=prompt
-            )
-            logger.info("Gemini API responded successfully")
-            return response.text.strip()
+            for attempt in range(1, MAX_RETRIES + 1):
+                response = self.geminiClient.models.generate_content(
+                    model=self.geminiModel,
+                    contents=prompt
+                )
+                if response and response.text:
+                    logger.info("Gemini API responded successfully | Attempt=%d", attempt)
+                    return response.text.strip()
+                logger.warning("Gemini returned empty response | Attempt=%d/%d", attempt, MAX_RETRIES)
+                if attempt < MAX_RETRIES:
+                    time.sleep(2 * attempt)
+            return None
         except Exception as e:
             logger.error("Gemini API call failed | Error=%s", str(e))
             return None
@@ -187,13 +212,19 @@ class ProcessReceipts:
     def _call_groq(self, prompt: str) -> str | None:
         try:
             logger.info("Calling Groq API")
-            response = self.groqClient.chat.completions.create(
-                model=self.groqModel,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=1024
-            )
-            logger.info("Groq API responded successfully")
-            return response.choices[0].message.content.strip()
+            for attempt in range(1, MAX_RETRIES + 1):
+                response = self.groqClient.chat.completions.create(
+                    model=self.groqModel,
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=1024
+                )
+                if response and response.choices[0].message.content:
+                    logger.info("Groq API responded successfully | Attempt=%d", attempt)
+                    return response.choices[0].message.content.strip()
+                logger.warning("Groq returned empty response | Attempt=%d/%d", attempt, MAX_RETRIES)
+                if attempt < MAX_RETRIES:
+                    time.sleep(2 * attempt)
+            return None
         except Exception as e:
             logger.error("Groq API call failed | Error=%s", str(e))
             return None
