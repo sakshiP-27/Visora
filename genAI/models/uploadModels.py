@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import Optional
 
 
 # Request models
@@ -22,7 +23,7 @@ class ReceiptItem(BaseModel):
 # Response model
 class UploadReceiptResponse(BaseModel):
     merchant: str
-    date: str
+    date: Optional[str] = ""
     totalAmount: float
     currency: str
     items: list[ReceiptItem]

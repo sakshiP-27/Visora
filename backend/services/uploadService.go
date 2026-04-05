@@ -226,7 +226,7 @@ func sendUploadReceiptToGenAI(imageBytes []byte, currency string) ([]byte, error
 			slog.Int("ResponseSizeBytes", len(responseBody)),
 		)
 		errJsonData, internalServerError := errors.NewInternalServerError(
-			fmt.Sprintf("GenAI service error (status %d)", response.StatusCode), nil)
+			"We're having trouble processing your receipt right now. Please try again shortly.", nil)
 		return nil, internalServerError, internalServerError.Code, errJsonData
 	}
 

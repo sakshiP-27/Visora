@@ -91,7 +91,7 @@ func callGenAI(endpoint string, payload any) ([]byte, error) {
 			slog.Int("StatusCode", resp.StatusCode),
 			slog.Int("ResponseSizeBytes", len(body)),
 		)
-		return nil, fmt.Errorf("GenAI service error (status %d): %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("unable to process request, please try again later")
 	}
 
 	slog.Info("GenAI response received",

@@ -45,8 +45,11 @@ class ProcessReceipts:
     def convertImageToData(self, image: str, currency: str) -> dict:
         # Decode the base64 image
         imageBytes = base64.b64decode(image)
-        pilImage = Image.open(BytesIO(imageBytes))
-        extension = (pilImage.format or "jpg").lower()
+        try:
+            pilImage = Image.open(BytesIO(imageBytes))
+            extension = (pilImage.format or "jpg").lower()
+        except Exception:
+            raise RuntimeError("Unsupported image format. Please upload a JPEG or PNG image.")
 
         logger.info("Image decoded | Format=%s SizeBytes=%d", extension, len(imageBytes))
 
@@ -85,6 +88,17 @@ class ProcessReceipts:
         date = fields.get("date").value
         totalAmount = fields.get("total_amount").value
         currencyCode = fields["locale"].fields["currency"].value
+
+        # Fallback: use today's date if OCR couldn't extract one
+        if not date:
+            from datetime import date as dt_date
+            date = str(dt_date.today())
+            logger.info("Date not found in receipt, using today's date | Date=%s", date)
+
+        # Fallback: use the user's selected currency if OCR couldn't detect one
+        if not currencyCode:
+            currencyCode = currency
+            logger.info("Currency not found in receipt, using user currency | Currency=%s", currencyCode)
 
         logger.info("OCR extraction complete | Merchant=%s Date=%s Total=%s Currency=%s",
                      merchantName, date, totalAmount, currencyCode)
