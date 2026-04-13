@@ -47,6 +47,7 @@ class BuildInsights:
             f'"summary": A concise 1-2 sentence overview of their spending in {context["currency"]}. '
             f"Mention the total, the biggest spending category, and one useful observation.\n"
             f'"warnings": An array of at least 2 strings. Each warning should be a specific, actionable insight like:\n'
+            f'"NOTE": Prepare fresh new insights on the shared data everytime you are asked to create the insights and do not append new insights to the old ones. ' 
             f"  - Which category they're spending the most on and a practical tip to reduce it\n"
             f"  - A spending pattern they might not notice (e.g. frequent small purchases adding up)\n"
             f"  - A suggestion to set a budget for their top category\n"

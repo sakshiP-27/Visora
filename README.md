@@ -37,17 +37,17 @@ visora.me (Vercel)  ──HTTPS──►  api.visora.me (Cloudflare Tunnel)
                                        │
                                        ▼
                               ┌─────────────────┐
-                              │  Zoro (ECS)      │
-                              │  Go Backend      │
-                              │  + cloudflared   │
-                              │  Port 3000       │
-                              └────────┬─────────┘
+                              │  Zoro (ECS)     │
+                              │  Go Backend     │
+                              │  + cloudflared  │
+                              │  Port 3000      │
+                              └────────┬────────┘
                                        │ VPC internal
                                        ▼
                               ┌─────────────────┐
-                              │  Sanji (ECS)     │
-                              │  FastAPI GenAI   │
-                              │  Port 4000       │
+                              │  Sanji (ECS)    │
+                              │  FastAPI GenAI  │
+                              │  Port 4000      │
                               └─────────────────┘
                               sanji-genai.strawhats.local
                               (AWS Cloud Map)

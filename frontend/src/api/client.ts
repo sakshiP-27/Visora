@@ -23,8 +23,14 @@ async function request<T>(
   }
 
   if (!res.ok) {
-    // Don't expose internal error details to the user
+    // For auth endpoints, show the backend's user-facing message
     const status = res.status;
+    try {
+      const data = await res.json();
+      if (status === 400 && data.message) throw new Error(data.message);
+    } catch (e) {
+      if (e instanceof Error && e.message !== 'Unexpected end of JSON input') throw e;
+    }
     if (status === 401) throw new Error('Session expired. Please log in again.');
     if (status === 403) throw new Error('You don\'t have permission to do that.');
     if (status === 404) throw new Error('The requested resource was not found.');
