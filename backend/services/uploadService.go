@@ -28,7 +28,11 @@ func init() {
 }
 
 func getGenAIURL() string {
-	return fmt.Sprintf("http://%s%s%s", serverConfig.GenAIHost, serverConfig.GenAIPort, serverConfig.GenAIUploadEndpoint)
+	protocol := "http"
+	if serverConfig.Env == "production" {
+		protocol = "https"
+	}
+	return fmt.Sprintf("%s://%s%s%s", protocol, serverConfig.GenAIHost, serverConfig.GenAIPort, serverConfig.GenAIUploadEndpoint)
 }
 
 func NewUploadService(repo *repositories.UploadRepository, summaryService *SummaryService) *UploadService {

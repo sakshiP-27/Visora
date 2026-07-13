@@ -131,7 +131,11 @@ func (s *SummaryService) RecomputeAnalytics(userID string) error {
 	payload := buildGenAIPayload(userID, rows)
 
 	cfg := configs.GetServerConfig()
-	url := fmt.Sprintf("http://%s%s%s", cfg.GenAIHost, cfg.GenAIPort, cfg.GenAIGetAnalyticsEndpoint)
+	protocol := "http"
+	if cfg.Env == "production" {
+		protocol = "https"
+	}
+	url := fmt.Sprintf("%s://%s%s%s", protocol, cfg.GenAIHost, cfg.GenAIPort, cfg.GenAIGetAnalyticsEndpoint)
 
 	body, err := callGenAI(url, payload)
 	if err != nil {
@@ -183,7 +187,11 @@ func (s *SummaryService) RecomputeInsights(userID string) error {
 	payload := buildGenAIPayload(userID, rows)
 
 	cfg := configs.GetServerConfig()
-	url := fmt.Sprintf("http://%s%s%s", cfg.GenAIHost, cfg.GenAIPort, cfg.GenAIGenerateSummaryEndpoint)
+	protocol := "http"
+	if cfg.Env == "production" {
+		protocol = "https"
+	}
+	url := fmt.Sprintf("%s://%s%s%s", protocol, cfg.GenAIHost, cfg.GenAIPort, cfg.GenAIGenerateSummaryEndpoint)
 
 	body, err := callGenAI(url, payload)
 	if err != nil {
