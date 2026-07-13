@@ -1,5 +1,6 @@
 import logging
-from fastapi import FastAPI
+import os
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from models.uploadModels import (
     UploadReceiptRequest, 
@@ -20,6 +21,24 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 
 app = FastAPI()
 config = ServerConfig()
+
+SERVICE_SECRET = os.getenv("SERVICE_SECRET", "")
+
+
+@app.middleware("http")
+async def verify_service_secret(request: Request, call_next):
+    # Allow health checks without auth
+    if request.url.path == "/health":
+        return await call_next(request)
+
+    # If SERVICE_SECRET is configured, enforce it
+    if SERVICE_SECRET:
+        incoming_secret = request.headers.get("X-Service-Secret", "")
+        if incoming_secret != SERVICE_SECRET:
+            logger.warning("Rejected request — invalid or missing service secret | Path=%s", request.url.path)
+            return JSONResponse(status_code=403, content={"error": "Forbidden"})
+
+    return await call_next(request)
 
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 print("Starting the GenAI Service")

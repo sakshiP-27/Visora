@@ -73,7 +73,19 @@ func callGenAI(endpoint string, payload any) ([]byte, error) {
 		slog.Int("PayloadSizeBytes", len(jsonBody)),
 	)
 
-	resp, err := http.Post(endpoint, "application/json", bytes.NewBuffer(jsonBody))
+	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		slog.Error("Failed to create GenAI request", slog.String("URL", endpoint))
+		return nil, fmt.Errorf("error while creating request to GenAI service: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	cfg := configs.GetServerConfig()
+	if cfg.ServiceSecret != "" {
+		req.Header.Set("X-Service-Secret", cfg.ServiceSecret)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		slog.Error("Failed to send request to GenAI service", slog.String("URL", endpoint))
 		return nil, fmt.Errorf("error while sending the request to GenAI service: %w", err)

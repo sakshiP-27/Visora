@@ -200,7 +200,18 @@ func sendUploadReceiptToGenAI(imageBytes []byte, currency string) ([]byte, error
 		slog.Int("PayloadSizeBytes", len(jsonBody)),
 	)
 
-	response, err := http.Post(genAIURL, "application/json", bytes.NewBuffer(jsonBody))
+	req, err := http.NewRequest("POST", genAIURL, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		slog.Error("Failed to create GenAI request")
+		errJsonData, internalServerError := errors.NewInternalServerError("Error while creating request to GenAI service", err)
+		return nil, internalServerError, internalServerError.Code, errJsonData
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if serverConfig.ServiceSecret != "" {
+		req.Header.Set("X-Service-Secret", serverConfig.ServiceSecret)
+	}
+
+	response, err := http.DefaultClient.Do(req)
 
 	if err != nil {
 		slog.Error("Failed to send request to GenAI service",
