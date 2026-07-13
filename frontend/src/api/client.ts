@@ -22,8 +22,11 @@ async function request<T>(
     throw new Error('Unable to connect. Please check your internet and try again.');
   }
 
+  if (res.status === 429) {
+    throw new Error('Rate limit exceeded. Please wait a moment before trying again.');
+  }
+
   if (!res.ok) {
-    // For auth endpoints, show the backend's user-facing message
     const status = res.status;
     try {
       const data = await res.json();

@@ -28,7 +28,11 @@ func init() {
 }
 
 func getGenAIURL() string {
-	return fmt.Sprintf("http://%s%s%s", serverConfig.GenAIHost, serverConfig.GenAIPort, serverConfig.GenAIUploadEndpoint)
+	protocol := "http"
+	if serverConfig.Env == "production" {
+		protocol = "https"
+	}
+	return fmt.Sprintf("%s://%s%s%s", protocol, serverConfig.GenAIHost, serverConfig.GenAIPort, serverConfig.GenAIUploadEndpoint)
 }
 
 func NewUploadService(repo *repositories.UploadRepository, summaryService *SummaryService) *UploadService {
@@ -200,7 +204,18 @@ func sendUploadReceiptToGenAI(imageBytes []byte, currency string) ([]byte, error
 		slog.Int("PayloadSizeBytes", len(jsonBody)),
 	)
 
-	response, err := http.Post(genAIURL, "application/json", bytes.NewBuffer(jsonBody))
+	req, err := http.NewRequest("POST", genAIURL, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		slog.Error("Failed to create GenAI request")
+		errJsonData, internalServerError := errors.NewInternalServerError("Error while creating request to GenAI service", err)
+		return nil, internalServerError, internalServerError.Code, errJsonData
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if serverConfig.ServiceSecret != "" {
+		req.Header.Set("X-Service-Secret", serverConfig.ServiceSecret)
+	}
+
+	response, err := http.DefaultClient.Do(req)
 
 	if err != nil {
 		slog.Error("Failed to send request to GenAI service",

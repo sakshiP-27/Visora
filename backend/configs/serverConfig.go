@@ -26,6 +26,7 @@ type ServerConfig struct {
 	SecretKey                    string
 	DatabaseConnectionString     string
 	BucketEndpoint               string
+	ServiceSecret                string
 }
 
 func GetServerConfig() *ServerConfig {
@@ -56,6 +57,7 @@ func GetServerConfig() *ServerConfig {
 		SecretKey:                    os.Getenv("ENCRYPTION_SECRET_KEY"),
 		DatabaseConnectionString:     os.Getenv("DATABASE_CONNECTION_STRING"),
 		BucketEndpoint:               os.Getenv("BUCKET_ENDPOINT_STRING"),
+		ServiceSecret:                os.Getenv("SERVICE_SECRET"),
 	}
 
 	return serverConfig

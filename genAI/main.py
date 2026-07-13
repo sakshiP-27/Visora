@@ -1,5 +1,6 @@
 import logging
-from fastapi import FastAPI
+import os
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from models.uploadModels import (
     UploadReceiptRequest, 
@@ -21,6 +22,24 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 app = FastAPI()
 config = ServerConfig()
 
+SERVICE_SECRET = os.getenv("SERVICE_SECRET", "")
+
+
+@app.middleware("http")
+async def verify_service_secret(request: Request, call_next):
+    # Allow health checks without auth
+    if request.url.path == "/health":
+        return await call_next(request)
+
+    # If SERVICE_SECRET is configured, enforce it
+    if SERVICE_SECRET:
+        incoming_secret = request.headers.get("X-Service-Secret", "")
+        if incoming_secret != SERVICE_SECRET:
+            logger.warning("Rejected request — invalid or missing service secret | Path=%s", request.url.path)
+            return JSONResponse(status_code=403, content={"error": "Forbidden"})
+
+    return await call_next(request)
+
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 print("Starting the GenAI Service")
 print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -35,7 +54,7 @@ def read_health():
 def process_uploaded_receipt(request: UploadReceiptRequest):
     logger.info("Receipt upload request received | Currency=%s", request.userContext.currency)
     try:
-        cvHandler = ProcessReceipts(config.OCR_API_KEY, config.MODEL_ID, config.GEMINI_API_KEY, config.GROQ_API_KEY, config.GEMINI_MODEL, config.GROQ_MODEL)
+        cvHandler = ProcessReceipts(None, None, config.GEMINI_API_KEY, config.GROQ_API_KEY, config.GEMINI_MODEL, config.GROQ_MODEL)
         receiptData = cvHandler.convertImageToData(request.image, request.userContext.currency)
         logger.info("Receipt processed successfully | Merchant=%s ItemCount=%d",
                      receiptData.get("merchant", "unknown"), len(receiptData.get("items", [])))

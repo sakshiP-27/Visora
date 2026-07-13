@@ -74,10 +74,20 @@ func main() {
 		r.Use(middlewares.AuthZMiddleware)
 		r.Use(middlewares.AuthNMiddleware)
 
-		r.Post(serverConfig.BackendUploadAPI, uploadHandler.HandleReceiptUploads)
-		r.Post(serverConfig.BackendManualExpenseAPI, uploadHandler.HandleManualExpense)
-		r.Get(serverConfig.BackendAnalyticsAPI, summaryHandler.HandleGetAnalytics)
-		r.Get(serverConfig.BackendInsightsAPI, summaryHandler.HandleGetInsights)
+		// tight rate limit on the OCR, LLMs APIs
+		r.Group(func(r chi.Router) {
+			r.Use(middlewares.RateLimitMiddleware(3, 1*time.Minute))
+			r.Post(serverConfig.BackendUploadAPI, uploadHandler.HandleReceiptUploads)
+			r.Post(serverConfig.BackendManualExpenseAPI, uploadHandler.HandleManualExpense)
+		})
+
+		// lighter rate limits on analytics / insights
+		r.Group(func(r chi.Router) {
+			r.Use(middlewares.RateLimitMiddleware(10, 1*time.Minute))
+			r.Get(serverConfig.BackendAnalyticsAPI, summaryHandler.HandleGetAnalytics)
+			r.Get(serverConfig.BackendInsightsAPI, summaryHandler.HandleGetInsights)
+		})
+
 		r.Get(serverConfig.BackendDayReceiptsAPI, summaryHandler.HandleGetTodayReceipts)
 	})
 
